@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TurboTap Auto Clicker
 // @namespace    http://tampermonkey.net/
-// @version      2.0
-// @description  TurboTap Auto Clicker MILK UPDATE
+// @version      2.1
+// @description  TurboTap Auto Clicker MILK CAPTCHA UPDATE
 // @match        https://tap.eclipse.xyz/*
 // @grant        none
 // ==/UserScript==
@@ -13,6 +13,7 @@
     localStorage.removeItem('controlsPosition');
 
     let isPageTransitioning = false;
+    let isCaptchaActive = false;
 
     function detectPageTransition() {
         window.addEventListener('beforeunload', () => {
@@ -26,6 +27,102 @@
         if (localStorage.getItem('isTransitioning') === 'true') {
             localStorage.removeItem('isTransitioning');
         }
+    }
+
+    function isCaptchaPresent() {
+        return !!document.querySelector('div[role="dialog"][data-sentry-source-file="ModalAutoClickChallenge.tsx"], div[role="dialog"][data-sentry-component="ModalAutoClickChallenge"]');
+    }
+
+    function handleCaptcha() {
+        if (!isCaptchaPresent()) return false;
+
+        const captchaButton = document.querySelector('button[type="button"][data-sentry-source-file="ModalAutoClickChallenge.tsx"], button[data-sentry-component="Button"][data-sentry-source-file="ModalAutoClickChallenge.tsx"]');
+        if (captchaButton) {
+            const delay = 3000 + Math.random() * 3000;
+
+            const captchaStatus = document.getElementById('captcha-status');
+            if (captchaStatus) {
+                captchaStatus.innerHTML = '🤖 Капча: НАЙДЕНА! Ожидание...';
+                captchaStatus.style.background = '#9F0B0B';
+                captchaStatus.style.fontWeight = 'bold';
+            }
+
+            isCaptchaActive = true;
+            const wasPaused = isPaused;
+            isPaused = true;
+
+            try {
+                captchaButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {}
+
+            setTimeout(() => {
+                if (isCaptchaPresent()) {
+                    simulateRealClick(captchaButton);
+
+                    if (captchaStatus) {
+                        captchaStatus.innerHTML = '🤖 Капча: нажимаю кнопку...';
+
+                        setTimeout(() => {
+                            if (!isCaptchaPresent()) {
+                                captchaStatus.innerHTML = '🤖 Капча: пройдена, ожидание...';
+                                captchaStatus.style.background = '#0B979F';
+
+                                const resumeDelay = 3000 + Math.random() * 2000;
+                                setTimeout(() => {
+                                    isCaptchaActive = false;
+                                    isPaused = wasPaused;
+                                    captchaStatus.innerHTML = '🤖 Капча: не найдена';
+                                    captchaStatus.style.background = '#333';
+                                    captchaStatus.style.fontWeight = 'normal';
+                                }, resumeDelay);
+                            } else {
+                                handleCaptcha();
+                            }
+                        }, 1000);
+                    }
+                } else {
+                    isCaptchaActive = false;
+                    isPaused = wasPaused;
+                    if (captchaStatus) {
+                        captchaStatus.innerHTML = '🤖 Капча: пройдена, ожидание...';
+                        captchaStatus.style.background = '#0B979F';
+
+                        const resumeDelay = 3000 + Math.random() * 2000;
+                        setTimeout(() => {
+                            isCaptchaActive = false;
+                            isPaused = wasPaused;
+                            captchaStatus.innerHTML = '🤖 Капча: не найдена';
+                            captchaStatus.style.background = '#333';
+                            captchaStatus.style.fontWeight = 'normal';
+                        }, resumeDelay);
+                    }
+                }
+            }, delay);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    function checkForCaptcha() {
+        const isPresent = isCaptchaPresent();
+
+        const captchaStatus = document.getElementById('captcha-status');
+        if (captchaStatus) {
+            if (isPresent && !isCaptchaActive) {
+                captchaStatus.innerHTML = '🤖 Капча: НАЙДЕНА!';
+                captchaStatus.style.background = '#9F0B0B';
+                captchaStatus.style.fontWeight = 'bold';
+                handleCaptcha();
+            } else if (!isPresent && !isCaptchaActive) {
+                captchaStatus.innerHTML = '🤖 Капча: не найдена';
+                captchaStatus.style.background = '#333';
+                captchaStatus.style.fontWeight = 'normal';
+            }
+        }
+
+        return isPresent;
     }
 
     function waitForElements() {
@@ -234,6 +331,20 @@
             font-size: 14px;
         `;
 
+        const captchaStatus = document.createElement('div');
+        captchaStatus.id = 'captcha-status';
+        captchaStatus.innerHTML = '🤖 Капча: не найдена';
+        captchaStatus.style.cssText = `
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            background: #333;
+            color: white;
+            text-align: center;
+            margin-bottom: 12px;
+            font-size: 14px;
+        `;
+
         const fertilizerToggle = document.createElement('div');
         fertilizerToggle.style.cssText = `
             display: flex;
@@ -341,6 +452,7 @@
             bullStatus,
             milkStatus,
             fertilizerStatus,
+            captchaStatus,
             milkToggle,
             fertilizerToggle,
             shortPauseInputs.container,
@@ -356,6 +468,7 @@
             bullStatus,
             milkStatus,
             fertilizerStatus,
+            captchaStatus,
             milkToggleButton,
             fertilizerToggleButton,
             shortPauseInputs,
@@ -535,6 +648,7 @@
         if (!milkAutoClickEnabled) return;
 
         if (!isBullActive()) return;
+        if (isCaptchaPresent() || isCaptchaActive) return;
 
         const milkPopup = document.querySelector('button[data-sentry-component="MilkPopup"]');
 
@@ -542,19 +656,21 @@
             const delay = Math.random() * 1000 + 500;
 
             setTimeout(() => {
-                simulateRealClick(milkPopup);
+                if (!isCaptchaPresent() && !isCaptchaActive) {
+                    simulateRealClick(milkPopup);
 
-                const milkStatus = document.getElementById('milk-status');
-                if (milkStatus) {
-                    milkStatus.innerHTML = '🥛 Молоко: СОБРАНО!';
-                    milkStatus.style.background = '#0B979F';
-                    milkStatus.style.fontWeight = 'bold';
+                    const milkStatus = document.getElementById('milk-status');
+                    if (milkStatus) {
+                        milkStatus.innerHTML = '🥛 Молоко: СОБРАНО!';
+                        milkStatus.style.background = '#0B979F';
+                        milkStatus.style.fontWeight = 'bold';
 
-                    setTimeout(() => {
-                        milkStatus.innerHTML = '🥛 Молоко: не найдено';
-                        milkStatus.style.background = '#333';
-                        milkStatus.style.fontWeight = 'normal';
-                    }, 2000);
+                        setTimeout(() => {
+                            milkStatus.innerHTML = '🥛 Молоко: не найдено';
+                            milkStatus.style.background = '#333';
+                            milkStatus.style.fontWeight = 'normal';
+                        }, 2000);
+                    }
                 }
             }, delay);
         }
@@ -606,6 +722,7 @@
 
         if (!fertilizerAutoClickEnabled || !isMainClickerEnabled) return;
         if (!isBullActive()) return;
+        if (isCaptchaPresent() || isCaptchaActive) return;
 
         const fertilizerButton = findFertilizerButton();
 
@@ -615,7 +732,7 @@
             const delay = Math.random() * 1000 + 500;
 
             setTimeout(() => {
-                if (!isPaused && !isPageTransitioning) {
+                if (!isPaused && !isPageTransitioning && !isCaptchaPresent() && !isCaptchaActive) {
                     simulateRealClick(fertilizerButton);
 
                     const fertilizerStatus = document.getElementById('fertilizer-status');
@@ -691,10 +808,12 @@
         let isClicking = localStorage.getItem('autoClickerEnabled') === 'true';
         let clickCount = parseInt(localStorage.getItem('clickCount') || '0');
 
+        checkForCaptcha();
+
         const milkObserver = setupMilkObserver();
 
         const milkCheckInterval = setInterval(() => {
-            if (isBullActive() && !isPageTransitioning) {
+            if (isBullActive() && !isPageTransitioning && !isCaptchaPresent() && !isCaptchaActive) {
                 const milkPopup = checkForMilkPopup();
                 if (milkPopup) {
                     handleMilkAutoClick();
@@ -750,6 +869,11 @@
             if (!isClicking || isPageTransitioning) return;
 
             if (!isBullActive()) {
+                clickTimeout = setTimeout(performClick, 1000);
+                return;
+            }
+
+            if (isCaptchaPresent() || isCaptchaActive) {
                 clickTimeout = setTimeout(performClick, 1000);
                 return;
             }
@@ -872,6 +996,12 @@
                 handleFertilizerClick();
             }
         }, 10000);
+
+        const captchaCheckInterval = setInterval(() => {
+            if (!isPageTransitioning) {
+                checkForCaptcha();
+            }
+        }, 1000);
     }
 
     initAutoClicker().catch(console.error);
