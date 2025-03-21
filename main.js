@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TurboTap Auto Clicker
 // @namespace    http://tampermonkey.net/
-// @version      2.1
-// @description  TurboTap Auto Clicker MILK CAPTCHA UPDATE
+// @version      2.2
+// @description  TurboTap Auto Clicker MILK UPDATE with CAPTCHA handling
 // @match        https://tap.eclipse.xyz/*
 // @grant        none
 // ==/UserScript==
@@ -35,38 +35,38 @@
 
     function handleCaptcha() {
         if (!isCaptchaPresent()) return false;
-
+        
         const captchaButton = document.querySelector('button[type="button"][data-sentry-source-file="ModalAutoClickChallenge.tsx"], button[data-sentry-component="Button"][data-sentry-source-file="ModalAutoClickChallenge.tsx"]');
         if (captchaButton) {
             const delay = 3000 + Math.random() * 3000;
-
+            
             const captchaStatus = document.getElementById('captcha-status');
             if (captchaStatus) {
                 captchaStatus.innerHTML = '🤖 Капча: НАЙДЕНА! Ожидание...';
                 captchaStatus.style.background = '#9F0B0B';
                 captchaStatus.style.fontWeight = 'bold';
             }
-
+            
             isCaptchaActive = true;
             const wasPaused = isPaused;
             isPaused = true;
-
+            
             try {
                 captchaButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
             } catch (e) {}
-
+            
             setTimeout(() => {
                 if (isCaptchaPresent()) {
                     simulateRealClick(captchaButton);
-
+                    
                     if (captchaStatus) {
                         captchaStatus.innerHTML = '🤖 Капча: нажимаю кнопку...';
-
+                        
                         setTimeout(() => {
                             if (!isCaptchaPresent()) {
                                 captchaStatus.innerHTML = '🤖 Капча: пройдена, ожидание...';
                                 captchaStatus.style.background = '#0B979F';
-
+                                
                                 const resumeDelay = 3000 + Math.random() * 2000;
                                 setTimeout(() => {
                                     isCaptchaActive = false;
@@ -86,7 +86,7 @@
                     if (captchaStatus) {
                         captchaStatus.innerHTML = '🤖 Капча: пройдена, ожидание...';
                         captchaStatus.style.background = '#0B979F';
-
+                        
                         const resumeDelay = 3000 + Math.random() * 2000;
                         setTimeout(() => {
                             isCaptchaActive = false;
@@ -98,16 +98,16 @@
                     }
                 }
             }, delay);
-
+            
             return true;
         }
-
+        
         return false;
     }
 
     function checkForCaptcha() {
         const isPresent = isCaptchaPresent();
-
+        
         const captchaStatus = document.getElementById('captcha-status');
         if (captchaStatus) {
             if (isPresent && !isCaptchaActive) {
@@ -121,7 +121,7 @@
                 captchaStatus.style.fontWeight = 'normal';
             }
         }
-
+        
         return isPresent;
     }
 
@@ -881,11 +881,17 @@
             const milkPopup = checkForMilkPopup();
 
             if (milkPopup) {
-                const delay = Math.random() * 1000 + 500;
-                setTimeout(() => {
-                    simulateRealClick(milkPopup);
+                const milkAutoClickEnabled = localStorage.getItem('milkAutoClickEnabled') !== 'false';
+                
+                if (milkAutoClickEnabled) {
+                    const delay = Math.random() * 1000 + 500;
+                    setTimeout(() => {
+                        simulateRealClick(milkPopup);
+                        clickTimeout = setTimeout(performClick, 300 + Math.random() * 200);
+                    }, delay);
+                } else {
                     clickTimeout = setTimeout(performClick, 300 + Math.random() * 200);
-                }, delay);
+                }
                 return;
             }
 
